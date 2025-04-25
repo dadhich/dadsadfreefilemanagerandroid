@@ -17,6 +17,7 @@ import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SearchView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DividerItemDecoration
@@ -36,6 +37,7 @@ class MainActivity : AppCompatActivity() {
     private val MANAGE_STORAGE_CODE = 101
     private lateinit var fileListRecyclerView: RecyclerView
     private val fileList = mutableListOf<FileItem>()
+    private val fullFileList = mutableListOf<FileItem>() // Store the full list for search filtering
     private lateinit var fileAdapter: FileAdapter
     private var currentDir: File? = null // Will be set in onCreate
     private var selectedFileItem: FileItem? = null
@@ -86,6 +88,35 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.menu_file_list, menu)
+
+        // Set up the SearchView
+        val searchItem = menu?.findItem(R.id.action_search)
+        val searchView = searchItem?.actionView as SearchView
+        searchView.queryHint = "Search files..."
+
+        searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                return false // Not handling submit action
+            }
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                filterFiles(newText ?: "")
+                return true
+            }
+        })
+
+        // Restore the full list when the SearchView is closed
+        searchItem.setOnActionExpandListener(object : MenuItem.OnActionExpandListener {
+            override fun onMenuItemActionExpand(item: MenuItem): Boolean {
+                return true
+            }
+
+            override fun onMenuItemActionCollapse(item: MenuItem): Boolean {
+                filterFiles("") // Clear the filter to show all files
+                return true
+            }
+        })
+
         return true
     }
 
@@ -146,6 +177,27 @@ class MainActivity : AppCompatActivity() {
         popupMenu.show()
     }
 
+    private fun filterFiles(query: String) {
+        fileList.clear()
+        if (query.isEmpty()) {
+            // Restore the full list with sorting applied
+            fileList.addAll(fullFileList)
+            sortAndUpdateFileList()
+        } else {
+            // Filter the list based on the query
+            val filteredList = fullFileList.filter {
+                it.name.lowercase(Locale.getDefault()).contains(query.lowercase(Locale.getDefault()))
+            }
+            fileList.addAll(filteredList)
+            // Apply sorting to the filtered list
+            sortAndUpdateFileList()
+            if (filteredList.isEmpty()) {
+                Toast.makeText(this, "No files found matching \"$query\"", Toast.LENGTH_SHORT).show()
+            }
+        }
+        fileAdapter.notifyDataSetChanged()
+    }
+
     override fun onSupportNavigateUp(): Boolean {
         if (operationMode != null) {
             operationMode = null
@@ -168,11 +220,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadFiles() {
         fileList.clear()
+        fullFileList.clear()
         try {
             val files = currentDir?.listFiles()
             if (files != null) {
                 files.forEach { file ->
-                    fileList.add(FileItem(file.name, file.isDirectory, file.absolutePath))
+                    val fileItem = FileItem(file.name, file.isDirectory, file.absolutePath)
+                    fileList.add(fileItem)
+                    fullFileList.add(fileItem)
                 }
                 if (fileList.isEmpty()) {
                     Toast.makeText(this, "No files found in ${currentDir?.absolutePath}", Toast.LENGTH_SHORT).show()
