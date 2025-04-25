@@ -24,6 +24,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -35,7 +36,10 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import android.webkit.MimeTypeMap
 import androidx.appcompat.widget.Toolbar
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 
 class MainActivity : AppCompatActivity() {
     private val STORAGE_PERMISSION_CODE = 100
@@ -89,7 +93,7 @@ class MainActivity : AppCompatActivity() {
                     currentDir = File(fileItem.path)
                     loadFiles()
                 } else {
-                    showFileDetails(fileItem)
+                    openFile(fileItem)
                 }
             }
         }
@@ -98,6 +102,43 @@ class MainActivity : AppCompatActivity() {
         registerForContextMenu(fileListRecyclerView)
 
         checkAndRequestPermissions()
+    }
+
+    private fun openFile(fileItem: FileItem) {
+        val file = File(fileItem.path)
+        try {
+            // Get the file URI using FileProvider
+            val uri = FileProvider.getUriForFile(
+                this,
+                "com.example.dadsad_freefilemanager.fileprovider",
+                file
+            )
+
+            // Determine the MIME type
+            val mimeType = getMimeType(file) ?: "*/*"
+
+            // Create an intent to view the file
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mimeType)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+
+            // Start the activity to open the file
+            startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Cannot open file: ${e.message}", Toast.LENGTH_LONG).show()
+            showFileDetails(fileItem) // Fallback to showing file details
+        }
+    }
+
+    private fun getMimeType(file: File): String? {
+        val extension = MimeTypeMap.getFileExtensionFromUrl(file.absolutePath)
+        return if (extension != null) {
+            MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.lowercase(Locale.getDefault()))
+        } else {
+            null
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
