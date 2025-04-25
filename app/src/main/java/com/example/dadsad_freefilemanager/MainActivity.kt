@@ -8,6 +8,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
+import android.view.ContextMenu
+import android.view.MenuItem
 import android.view.View
 import android.widget.Button
 import android.widget.Toast
@@ -18,6 +20,9 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.nio.channels.FileChannel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -34,6 +39,8 @@ class MainActivity : AppCompatActivity() {
     } else {
         Environment.getExternalStorageDirectory()
     }
+    private var selectedFileItem: FileItem? = null
+    private var operationMode: String? = null // "copy" or "move"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,26 +50,83 @@ class MainActivity : AppCompatActivity() {
         backButton = findViewById(R.id.backButton)
         fileListRecyclerView.layoutManager = LinearLayoutManager(this)
         fileAdapter = FileAdapter(fileList) { fileItem ->
-            if (fileItem.isDirectory) {
-                // Navigate into the folder
-                currentDir = File(fileItem.path)
-                loadFiles()
+            if (operationMode != null) {
+                // In copy/move mode, select destination folder
+                if (fileItem.isDirectory) {
+                    performFileOperation(fileItem.path)
+                } else {
+                    Toast.makeText(this, "Please select a folder as the destination", Toast.LENGTH_SHORT).show()
+                }
             } else {
-                // Show file details
-                showFileDetails(fileItem)
+                // Normal mode: navigate or show details
+                if (fileItem.isDirectory) {
+                    currentDir = File(fileItem.path)
+                    loadFiles()
+                } else {
+                    showFileDetails(fileItem)
+                }
             }
         }
         fileListRecyclerView.adapter = fileAdapter
+        registerForContextMenu(fileListRecyclerView)
 
         backButton.setOnClickListener {
-            // Navigate to parent directory
-            currentDir.parentFile?.let { parent ->
-                currentDir = parent
+            if (operationMode != null) {
+                // Cancel copy/move operation
+                operationMode = null
+                selectedFileItem = null
+                Toast.makeText(this, "Operation cancelled", Toast.LENGTH_SHORT).show()
                 loadFiles()
+            } else {
+                // Navigate to parent directory
+                currentDir.parentFile?.let { parent ->
+                    currentDir = parent
+                    loadFiles()
+                }
             }
         }
 
         checkAndRequestPermissions()
+    }
+
+    override fun onCreateContextMenu(
+        menu: ContextMenu?,
+        v: View?,
+        menuInfo: ContextMenu.ContextMenuInfo?
+    ) {
+        super.onCreateContextMenu(menu, v, menuInfo)
+        menuInflater.inflate(R.menu.menu_context, menu)
+    }
+
+    override fun onContextItemSelected(item: MenuItem): Boolean {
+        selectedFileItem = fileAdapter.getItemAtContextMenuPosition()
+        return when (item.itemId) {
+            R.id.action_copy -> {
+                operationMode = "copy"
+                Toast.makeText(this, "Select a destination folder to copy ${selectedFileItem?.name}", Toast.LENGTH_LONG).show()
+                true
+            }
+            R.id.action_move -> {
+                operationMode = "move"
+                Toast.makeText(this, "Select a destination folder to move ${selectedFileItem?.name}", Toast.LENGTH_LONG).show()
+                true
+            }
+            R.id.action_delete -> {
+                selectedFileItem?.let { fileItem ->
+                    AlertDialog.Builder(this)
+                        .setTitle("Delete ${fileItem.name}")
+                        .setMessage("Are you sure you want to delete this ${if (fileItem.isDirectory) "folder" else "file"}?")
+                        .setPositiveButton("Yes") { _, _ ->
+                            deleteFile(File(fileItem.path))
+                            loadFiles()
+                        }
+                        .setNegativeButton("No") { dialog, _ -> dialog.dismiss() }
+                        .show()
+                }
+                true
+            }
+            else -> super.onContextItemSelected(item)
+        }
     }
 
     private fun checkAndRequestPermissions() {
@@ -157,7 +221,7 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Error accessing files: ${e.message}", Toast.LENGTH_LONG).show()
         }
         fileAdapter.notifyDataSetChanged()
-        backButton.visibility = if (currentDir.absolutePath == "/storage/emulated/0") View.GONE else View.VISIBLE
+        backButton.visibility = if (operationMode != null || currentDir.absolutePath == "/storage/emulated/0") View.GONE else View.VISIBLE
     }
 
     private fun showFileDetails(fileItem: FileItem) {
@@ -176,5 +240,59 @@ class MainActivity : AppCompatActivity() {
             .setMessage(details)
             .setPositiveButton("OK") { dialog, _ -> dialog.dismiss() }
             .show()
+    }
+
+    private fun performFileOperation(destinationPath: String) {
+        selectedFileItem?.let { fileItem ->
+            val sourceFile = File(fileItem.path)
+            val destFile = File(destinationPath, fileItem.name)
+            try {
+                when (operationMode) {
+                    "copy" -> copyFileOrDirectory(sourceFile, destFile)
+                    "move" -> {
+                        copyFileOrDirectory(sourceFile, destFile)
+                        deleteFile(sourceFile)
+                    }
+                }
+                Toast.makeText(this, "${operationMode?.capitalize()} successful", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this, "${operationMode?.capitalize()} failed: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+            operationMode = null
+            selectedFileItem = null
+            loadFiles()
+        }
+    }
+
+    private fun copyFileOrDirectory(source: File, dest: File) {
+        if (source.isDirectory) {
+            if (!dest.exists()) dest.mkdirs()
+            source.listFiles()?.forEach { child ->
+                copyFileOrDirectory(child, File(dest, child.name))
+            }
+        } else {
+            FileInputStream(source).use { input ->
+                FileOutputStream(dest).use { output ->
+                    val channelIn: FileChannel? = input.channel
+                    val channelOut: FileChannel? = output.channel
+                    channelIn?.transferTo(0, channelIn.size(), channelOut)
+                }
+            }
+        }
+    }
+
+    private fun deleteFile(file: File) {
+        try {
+            if (file.isDirectory) {
+                file.listFiles()?.forEach { child -> deleteFile(child) }
+            }
+            if (file.delete()) {
+                Toast.makeText(this, "Deleted successfully", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Failed to delete ${file.name}", Toast.LENGTH_LONG).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Delete failed: ${e.message}", Toast.LENGTH_LONG).show()
+        }
     }
 }
