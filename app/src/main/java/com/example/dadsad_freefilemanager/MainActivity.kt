@@ -12,6 +12,7 @@ import android.view.ContextMenu
 import android.view.MenuItem
 import android.view.View
 import android.widget.Button
+import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -53,14 +54,12 @@ class MainActivity : AppCompatActivity() {
         fileListRecyclerView.addItemDecoration(DividerItemDecoration(this, LinearLayoutManager.VERTICAL))
         fileAdapter = FileAdapter(fileList) { fileItem ->
             if (operationMode != null) {
-                // In copy/move mode, select destination folder
                 if (fileItem.isDirectory) {
                     performFileOperation(fileItem.path)
                 } else {
                     Toast.makeText(this, "Please select a folder as the destination", Toast.LENGTH_SHORT).show()
                 }
             } else {
-                // Normal mode: navigate or show details
                 if (fileItem.isDirectory) {
                     currentDir = File(fileItem.path)
                     loadFiles()
@@ -74,13 +73,11 @@ class MainActivity : AppCompatActivity() {
 
         backButton.setOnClickListener {
             if (operationMode != null) {
-                // Cancel copy/move operation
                 operationMode = null
                 selectedFileItem = null
                 Toast.makeText(this, "Operation cancelled", Toast.LENGTH_SHORT).show()
                 loadFiles()
             } else {
-                // Navigate to parent directory
                 currentDir.parentFile?.let { parent ->
                     currentDir = parent
                     loadFiles()
@@ -124,6 +121,12 @@ class MainActivity : AppCompatActivity() {
                         }
                         .setNegativeButton("No") { dialog, _ -> dialog.dismiss() }
                         .show()
+                }
+                true
+            }
+            R.id.action_rename -> { // New case for rename
+                selectedFileItem?.let { fileItem ->
+                    showRenameDialog(fileItem)
                 }
                 true
             }
@@ -242,6 +245,45 @@ class MainActivity : AppCompatActivity() {
             .setMessage(details)
             .setPositiveButton("OK") { dialog, _ -> dialog.dismiss() }
             .show()
+    }
+
+    private fun showRenameDialog(fileItem: FileItem) {
+        val editText = EditText(this).apply {
+            setText(fileItem.name)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Rename ${fileItem.name}")
+            .setView(editText)
+            .setPositiveButton("Rename") { _, _ ->
+                val newName = editText.text.toString().trim()
+                if (newName.isNotEmpty() && newName != fileItem.name) {
+                    renameFile(fileItem, newName)
+                } else if (newName.isEmpty()) {
+                    Toast.makeText(this, "Name cannot be empty", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+            .show()
+    }
+
+    private fun renameFile(fileItem: FileItem, newName: String) {
+        try {
+            val sourceFile = File(fileItem.path)
+            val parentDir = sourceFile.parentFile
+            val destFile = File(parentDir, newName)
+            if (destFile.exists()) {
+                Toast.makeText(this, "A file or folder with this name already exists", Toast.LENGTH_LONG).show()
+                return
+            }
+            if (sourceFile.renameTo(destFile)) {
+                Toast.makeText(this, "Renamed successfully", Toast.LENGTH_SHORT).show()
+                loadFiles()
+            } else {
+                Toast.makeText(this, "Failed to rename ${fileItem.name}", Toast.LENGTH_LONG).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Rename failed: ${e.message}", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun performFileOperation(destinationPath: String) {
