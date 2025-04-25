@@ -23,5 +23,6 @@
             </intent-filter>
         </activity>
         <activity android:name=".MainActivity" />
+        <!-- Removed: <activity android:name=".FileListActivity" /> -->
     </application>
 </manifest>
