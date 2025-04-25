@@ -6,52 +6,67 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import com.example.dadsad_freefilemanager.R
-import android.view.animation.AnimationUtils
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class FileAdapter(
-    private val fileList: List<FileItem>,
-    private val onItemClick: (FileItem) -> Unit
+    private val files: MutableList<FileItem>,
+    private val onClick: (FileItem) -> Unit
 ) : RecyclerView.Adapter<FileAdapter.FileViewHolder>() {
 
-    private var contextMenuPosition: Int = -1
+    private var contextMenuPosition: Int = -1 // Track the position for context menu
 
     class FileViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val fileIcon: ImageView = itemView.findViewById(R.id.fileIcon)
-        val fileNameTextView: TextView = itemView.findViewById(R.id.fileNameTextView)
-        val fileTypeTextView: TextView = itemView.findViewById(R.id.fileTypeTextView)
+        val icon: ImageView = itemView.findViewById(R.id.fileIcon)
+        val name: TextView = itemView.findViewById(R.id.fileName)
+        val details: TextView = itemView.findViewById(R.id.fileDetails)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FileViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_file, parent, false)
-        return FileViewHolder(view)
+        return FileViewHolder(view).apply {
+            // Set up long-click listener to open context menu
+            itemView.setOnLongClickListener {
+                contextMenuPosition = adapterPosition
+                false // Let the system handle the context menu
+            }
+            // Set up click listener
+            itemView.setOnClickListener {
+                val position = adapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    onClick(files[position])
+                }
+            }
+        }
     }
 
     override fun onBindViewHolder(holder: FileViewHolder, position: Int) {
-        val fileItem = fileList[position]
-        holder.fileIcon.setImageResource(
+        val fileItem = files[position]
+        holder.name.text = fileItem.name
+        holder.icon.setImageResource(
             if (fileItem.isDirectory) R.drawable.ic_folder else R.drawable.ic_file
         )
-        holder.fileNameTextView.text = fileItem.name
-        holder.fileTypeTextView.text = if (fileItem.isDirectory) "Folder" else "File"
-        holder.itemView.setOnClickListener {
-            onItemClick(fileItem)
+
+        val file = File(fileItem.path)
+        val details = if (fileItem.isDirectory) {
+            "Folder"
+        } else {
+            val size = file.length() / 1024 // Size in KB
+            val lastModified = SimpleDateFormat("MM/dd/yyyy", Locale.getDefault())
+                .format(file.lastModified())
+            "Size: $size KB | Modified: $lastModified"
         }
-        holder.itemView.setOnLongClickListener {
-            contextMenuPosition = position
-            false
-        }
-        // Apply fade-in animation
-        val animation = AnimationUtils.loadAnimation(holder.itemView.context, R.anim.fade_in)
-        holder.itemView.startAnimation(animation)
+        holder.details.text = details
     }
 
-    override fun getItemCount(): Int = fileList.size
+    override fun getItemCount(): Int = files.size
 
+    // Add method to get the item at the context menu position
     fun getItemAtContextMenuPosition(): FileItem? {
-        return if (contextMenuPosition >= 0 && contextMenuPosition < fileList.size) {
-            fileList[contextMenuPosition]
+        return if (contextMenuPosition != -1 && contextMenuPosition < files.size) {
+            files[contextMenuPosition]
         } else {
             null
         }
