@@ -7,6 +7,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.example.dadsad_freefilemanager.R
+import android.view.animation.AnimationUtils
 
 class FileAdapter(
     private val fileList: List<FileItem>,
@@ -30,7 +31,7 @@ class FileAdapter(
     override fun onBindViewHolder(holder: FileViewHolder, position: Int) {
         val fileItem = fileList[position]
         holder.fileIcon.setImageResource(
-            if (fileItem.isDirectory) android.R.drawable.ic_menu_gallery else android.R.drawable.ic_menu_edit
+            if (fileItem.isDirectory) R.drawable.ic_folder else R.drawable.ic_file
         )
         holder.fileNameTextView.text = fileItem.name
         holder.fileTypeTextView.text = if (fileItem.isDirectory) "Folder" else "File"
@@ -41,6 +42,9 @@ class FileAdapter(
             contextMenuPosition = position
             false
         }
+        // Apply fade-in animation
+        val animation = AnimationUtils.loadAnimation(holder.itemView.context, R.anim.fade_in)
+        holder.itemView.startAnimation(animation)
     }
 
     override fun getItemCount(): Int = fileList.size

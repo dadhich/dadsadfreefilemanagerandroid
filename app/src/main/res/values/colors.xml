@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#00897B</color> <!-- Teal -->
-    <color name="colorPrimaryDark">#005B4F</color> <!-- Darker Teal -->
+    <color name="colorPrimary">#4FC3F7</color> <!-- Light Blue from Cx File Explorer -->
+    <color name="colorPrimaryDark">#0288D1</color> <!-- Darker Blue -->
     <color name="colorAccent">#FFCA28</color> <!-- Amber for accents -->
-    <color name="background">#FFFFFF</color> <!-- White background -->
+    <color name="background">#F5F5F5</color> <!-- Light gray background -->
     <color name="textPrimary">#212121</color> <!-- Dark gray text -->
     <color name="textSecondary">#757575</color> <!-- Lighter gray text -->
 </resources>

@@ -28,6 +28,7 @@ import java.nio.channels.FileChannel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.appcompat.widget.Toolbar
 
 class MainActivity : AppCompatActivity() {
     private val STORAGE_PERMISSION_CODE = 100
@@ -36,11 +37,7 @@ class MainActivity : AppCompatActivity() {
     private val fileList = mutableListOf<FileItem>()
     private lateinit var fileAdapter: FileAdapter
     private lateinit var backButton: Button
-    private var currentDir: File = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        File("/storage/emulated/0/")
-    } else {
-        Environment.getExternalStorageDirectory()
-    }
+    private var currentDir: File? = null // Will be set in onCreate
     private var selectedFileItem: FileItem? = null
     private var operationMode: String? = null // "copy" or "move"
 
@@ -48,8 +45,16 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // Set up the toolbar
+        val toolbar: Toolbar = findViewById(R.id.toolbar)
+        setSupportActionBar(toolbar)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+
+        // Get the starting path from the intent
+        val startPath = intent.getStringExtra("START_PATH") ?: Environment.getExternalStorageDirectory().absolutePath
+        currentDir = File(startPath)
+
         fileListRecyclerView = findViewById(R.id.fileListRecyclerView)
-        backButton = findViewById(R.id.backButton)
         fileListRecyclerView.layoutManager = LinearLayoutManager(this)
         fileListRecyclerView.addItemDecoration(DividerItemDecoration(this, LinearLayoutManager.VERTICAL))
         fileAdapter = FileAdapter(fileList) { fileItem ->
@@ -71,21 +76,49 @@ class MainActivity : AppCompatActivity() {
         fileListRecyclerView.adapter = fileAdapter
         registerForContextMenu(fileListRecyclerView)
 
-        backButton.setOnClickListener {
-            if (operationMode != null) {
-                operationMode = null
-                selectedFileItem = null
-                Toast.makeText(this, "Operation cancelled", Toast.LENGTH_SHORT).show()
+        checkAndRequestPermissions()
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        if (operationMode != null) {
+            operationMode = null
+            selectedFileItem = null
+            Toast.makeText(this, "Operation cancelled", Toast.LENGTH_SHORT).show()
+            loadFiles()
+            return true
+        } else {
+            currentDir?.parentFile?.let { parent ->
+                currentDir = parent
                 loadFiles()
-            } else {
-                currentDir.parentFile?.let { parent ->
-                    currentDir = parent
-                    loadFiles()
-                }
+                return true
+            } ?: run {
+                finish()
+                overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+                return true
             }
         }
+    }
 
-        checkAndRequestPermissions()
+    private fun loadFiles() {
+        fileList.clear()
+        try {
+            val files = currentDir?.listFiles()
+            if (files != null) {
+                files.forEach { file ->
+                    fileList.add(FileItem(file.name, file.isDirectory, file.absolutePath))
+                }
+                if (fileList.isEmpty()) {
+                    Toast.makeText(this, "No files found in ${currentDir?.absolutePath}", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Toast.makeText(this, "Unable to access files in ${currentDir?.absolutePath}", Toast.LENGTH_LONG).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error accessing files: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+        fileAdapter.notifyDataSetChanged()
+        // Update toolbar title with current directory path
+        supportActionBar?.title = currentDir?.absolutePath ?: "File Manager"
     }
 
     override fun onCreateContextMenu(
@@ -124,7 +157,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 true
             }
-            R.id.action_rename -> { // New case for rename
+            R.id.action_rename -> {
                 selectedFileItem?.let { fileItem ->
                     showRenameDialog(fileItem)
                 }
@@ -208,26 +241,26 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadFiles() {
-        fileList.clear()
-        try {
-            val files = currentDir.listFiles()
-            if (files != null) {
-                files.forEach { file ->
-                    fileList.add(FileItem(file.name, file.isDirectory, file.absolutePath))
-                }
-                if (fileList.isEmpty()) {
-                    Toast.makeText(this, "No files found in ${currentDir.absolutePath}", Toast.LENGTH_SHORT).show()
-                }
-            } else {
-                Toast.makeText(this, "Unable to access files in ${currentDir.absolutePath}", Toast.LENGTH_LONG).show()
-            }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Error accessing files: ${e.message}", Toast.LENGTH_LONG).show()
-        }
-        fileAdapter.notifyDataSetChanged()
-        backButton.visibility = if (operationMode != null || currentDir.absolutePath == "/storage/emulated/0") View.GONE else View.VISIBLE
-    }
+//    private fun loadFiles() {
+//        fileList.clear()
+//        try {
+//            val files = currentDir?.listFiles()
+//            if (files != null) {
+//                files.forEach { file ->
+//                    fileList.add(FileItem(file.name, file.isDirectory, file.absolutePath))
+//                }
+//                if (fileList.isEmpty()) {
+//                    Toast.makeText(this, "No files found in ${currentDir?.absolutePath}", Toast.LENGTH_SHORT).show()
+//                }
+//            } else {
+//                Toast.makeText(this, "Unable to access files in ${currentDir?.absolutePath}", Toast.LENGTH_LONG).show()
+//            }
+//        } catch (e: Exception) {
+//            Toast.makeText(this, "Error accessing files: ${e.message}", Toast.LENGTH_LONG).show()
+//        }
+//        fileAdapter.notifyDataSetChanged()
+//        backButton.visibility = if (operationMode != null || currentDir?.absolutePath == "/storage/emulated/0") View.GONE else View.VISIBLE
+//    }
 
     private fun showFileDetails(fileItem: FileItem) {
         val file = File(fileItem.path)

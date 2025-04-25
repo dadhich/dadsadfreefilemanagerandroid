@@ -7,5 +7,7 @@
         <item name="android:background">@color/background</item>
         <item name="android:textColorPrimary">@color/textPrimary</item>
         <item name="android:textColorSecondary">@color/textSecondary</item>
+        <item name="windowActionBar">false</item> <!-- Disable default action bar -->
+        <item name="windowNoTitle">true</item> <!-- Remove title bar -->
     </style>
 </resources>
