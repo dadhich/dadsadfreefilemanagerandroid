@@ -9,10 +9,11 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
 import android.view.ContextMenu
+import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.widget.Button
 import android.widget.EditText
+import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -36,10 +37,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var fileListRecyclerView: RecyclerView
     private val fileList = mutableListOf<FileItem>()
     private lateinit var fileAdapter: FileAdapter
-    private lateinit var backButton: Button
     private var currentDir: File? = null // Will be set in onCreate
     private var selectedFileItem: FileItem? = null
     private var operationMode: String? = null // "copy" or "move"
+
+    // Sort criteria and order
+    private var sortBy: String = "name" // Default sort by name
+    private var sortOrder: String = "asc" // Default ascending order
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,6 +84,68 @@ class MainActivity : AppCompatActivity() {
         checkAndRequestPermissions()
     }
 
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.menu_file_list, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            android.R.id.home -> onSupportNavigateUp()
+            R.id.action_sort -> {
+                showSortMenu()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun showSortMenu() {
+        val menuItemView = findViewById<View>(R.id.action_sort)
+        val popupMenu = PopupMenu(this, menuItemView)
+        popupMenu.menuInflater.inflate(R.menu.menu_sort_options, popupMenu.menu)
+
+        popupMenu.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.sort_name_asc -> {
+                    sortBy = "name"
+                    sortOrder = "asc"
+                }
+                R.id.sort_name_desc -> {
+                    sortBy = "name"
+                    sortOrder = "desc"
+                }
+                R.id.sort_size_asc -> {
+                    sortBy = "size"
+                    sortOrder = "asc"
+                }
+                R.id.sort_size_desc -> {
+                    sortBy = "size"
+                    sortOrder = "desc"
+                }
+                R.id.sort_date_asc -> {
+                    sortBy = "date"
+                    sortOrder = "asc"
+                }
+                R.id.sort_date_desc -> {
+                    sortBy = "date"
+                    sortOrder = "desc"
+                }
+                R.id.sort_type_asc -> {
+                    sortBy = "type"
+                    sortOrder = "asc"
+                }
+                R.id.sort_type_desc -> {
+                    sortBy = "type"
+                    sortOrder = "desc"
+                }
+            }
+            sortAndUpdateFileList()
+            true
+        }
+        popupMenu.show()
+    }
+
     override fun onSupportNavigateUp(): Boolean {
         if (operationMode != null) {
             operationMode = null
@@ -117,9 +183,60 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Toast.makeText(this, "Error accessing files: ${e.message}", Toast.LENGTH_LONG).show()
         }
-        fileAdapter.notifyDataSetChanged()
+        sortAndUpdateFileList()
         // Update toolbar title with current directory path
         supportActionBar?.title = currentDir?.absolutePath ?: "File Manager"
+    }
+
+    private fun sortAndUpdateFileList() {
+        // Separate directories and files for better organization
+        val directories = fileList.filter { it.isDirectory }
+        val files = fileList.filter { !it.isDirectory }
+
+        // Sort directories
+        val sortedDirectories = directories.sortedWith(getComparator())
+        // Sort files
+        val sortedFiles = files.sortedWith(getComparator())
+
+        // Combine the lists: directories first, then files
+        fileList.clear()
+        fileList.addAll(sortedDirectories)
+        fileList.addAll(sortedFiles)
+
+        // Notify the adapter to refresh the RecyclerView
+        fileAdapter.notifyDataSetChanged()
+    }
+
+    private fun getComparator(): Comparator<FileItem> {
+        return when (sortBy) {
+            "name" -> Comparator { item1, item2 ->
+                val comparison = item1.name.compareTo(item2.name, ignoreCase = true)
+                if (sortOrder == "asc") comparison else -comparison
+            }
+            "size" -> Comparator { item1, item2 ->
+                val file1 = File(item1.path)
+                val file2 = File(item2.path)
+                val comparison = file1.length().compareTo(file2.length())
+                if (sortOrder == "asc") comparison else -comparison
+            }
+            "date" -> Comparator { item1, item2 ->
+                val file1 = File(item1.path)
+                val file2 = File(item2.path)
+                val comparison = file1.lastModified().compareTo(file2.lastModified())
+                if (sortOrder == "asc") comparison else -comparison
+            }
+            "type" -> Comparator { item1, item2 ->
+                val file1 = File(item1.path)
+                val file2 = File(item2.path)
+                val ext1 = file1.extension.lowercase(Locale.getDefault())
+                val ext2 = file2.extension.lowercase(Locale.getDefault())
+                val comparison = ext1.compareTo(ext2)
+                if (sortOrder == "asc") comparison else -comparison
+            }
+            else -> Comparator { item1, item2 ->
+                item1.name.compareTo(item2.name, ignoreCase = true)
+            }
+        }
     }
 
     override fun onCreateContextMenu(
@@ -241,27 +358,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
-//    private fun loadFiles() {
-//        fileList.clear()
-//        try {
-//            val files = currentDir?.listFiles()
-//            if (files != null) {
-//                files.forEach { file ->
-//                    fileList.add(FileItem(file.name, file.isDirectory, file.absolutePath))
-//                }
-//                if (fileList.isEmpty()) {
-//                    Toast.makeText(this, "No files found in ${currentDir?.absolutePath}", Toast.LENGTH_SHORT).show()
-//                }
-//            } else {
-//                Toast.makeText(this, "Unable to access files in ${currentDir?.absolutePath}", Toast.LENGTH_LONG).show()
-//            }
-//        } catch (e: Exception) {
-//            Toast.makeText(this, "Error accessing files: ${e.message}", Toast.LENGTH_LONG).show()
-//        }
-//        fileAdapter.notifyDataSetChanged()
-//        backButton.visibility = if (operationMode != null || currentDir?.absolutePath == "/storage/emulated/0") View.GONE else View.VISIBLE
-//    }
 
     private fun showFileDetails(fileItem: FileItem) {
         val file = File(fileItem.path)
