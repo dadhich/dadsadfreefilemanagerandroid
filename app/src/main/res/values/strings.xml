@@ -1,3 +1,19 @@
 <resources>
     <string name="app_name">Dad\'s Ad-Free File Manager</string>
+
+    <!-- Size filter options -->
+    <string-array name="size_filter_options">
+        <item>All Sizes</item>
+        <item>&lt; 1 MB</item>
+        <item>1-10 MB</item>
+        <item>&gt; 10 MB</item>
+    </string-array>
+
+    <!-- Date filter options -->
+    <string-array name="date_filter_options">
+        <item>All Dates</item>
+        <item>Today</item>
+        <item>This Week</item>
+        <item>Older</item>
+    </string-array>
 </resources>

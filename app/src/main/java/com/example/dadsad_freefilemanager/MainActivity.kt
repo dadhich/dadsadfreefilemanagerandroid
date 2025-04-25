@@ -7,13 +7,17 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.ContextMenu
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.PopupMenu
+import android.widget.Spinner
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -28,6 +32,7 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.nio.channels.FileChannel
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import androidx.appcompat.widget.Toolbar
@@ -37,7 +42,7 @@ class MainActivity : AppCompatActivity() {
     private val MANAGE_STORAGE_CODE = 101
     private lateinit var fileListRecyclerView: RecyclerView
     private val fileList = mutableListOf<FileItem>()
-    private val fullFileList = mutableListOf<FileItem>() // Store the full list for search filtering
+    private val fullFileList = mutableListOf<FileItem>() // Store all files recursively
     private lateinit var fileAdapter: FileAdapter
     private var currentDir: File? = null // Will be set in onCreate
     private var selectedFileItem: FileItem? = null
@@ -46,6 +51,14 @@ class MainActivity : AppCompatActivity() {
     // Sort criteria and order
     private var sortBy: String = "name" // Default sort by name
     private var sortOrder: String = "asc" // Default ascending order
+
+    // Search and filter variables
+    private var currentQuery: String = ""
+    private var filterType: String = "" // e.g., "txt", "pdf"
+    private var filterSize: String = "All Sizes" // e.g., "< 1 MB"
+    private var filterDate: String = "All Dates" // e.g., "Today"
+    private val handler = Handler(Looper.getMainLooper())
+    private var searchRunnable: Runnable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,6 +93,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+        fileAdapter.setCurrentDirPath(currentDir?.absolutePath ?: "")
         fileListRecyclerView.adapter = fileAdapter
         registerForContextMenu(fileListRecyclerView)
 
@@ -100,7 +114,8 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onQueryTextChange(newText: String?): Boolean {
-                filterFiles(newText ?: "")
+                currentQuery = newText ?: ""
+                debounceSearch()
                 return true
             }
         })
@@ -112,7 +127,8 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onMenuItemActionCollapse(item: MenuItem): Boolean {
-                filterFiles("") // Clear the filter to show all files
+                currentQuery = ""
+                filterFiles()
                 return true
             }
         })
@@ -125,6 +141,10 @@ class MainActivity : AppCompatActivity() {
             android.R.id.home -> onSupportNavigateUp()
             R.id.action_sort -> {
                 showSortMenu()
+                true
+            }
+            R.id.action_filter -> {
+                showFilterDialog()
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -177,22 +197,153 @@ class MainActivity : AppCompatActivity() {
         popupMenu.show()
     }
 
-    private fun filterFiles(query: String) {
+    private fun showFilterDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_filter, null)
+        val filterTypeEdit = dialogView.findViewById<EditText>(R.id.filter_type)
+        val filterSizeSpinner = dialogView.findViewById<Spinner>(R.id.filter_size)
+        val filterDateSpinner = dialogView.findViewById<Spinner>(R.id.filter_date)
+
+        // Set up spinners
+        ArrayAdapter.createFromResource(
+            this,
+            R.array.size_filter_options,
+            android.R.layout.simple_spinner_item
+        ).also { adapter ->
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            filterSizeSpinner.adapter = adapter
+            filterSizeSpinner.setSelection(
+                resources.getStringArray(R.array.size_filter_options).indexOf(filterSize)
+            )
+        }
+
+        ArrayAdapter.createFromResource(
+            this,
+            R.array.date_filter_options,
+            android.R.layout.simple_spinner_item
+        ).also { adapter ->
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            filterDateSpinner.adapter = adapter
+            filterDateSpinner.setSelection(
+                resources.getStringArray(R.array.date_filter_options).indexOf(filterDate)
+            )
+        }
+
+        // Set current filter type
+        filterTypeEdit.setText(filterType)
+
+        AlertDialog.Builder(this)
+            .setTitle("Filter Search Results")
+            .setView(dialogView)
+            .setPositiveButton("Apply") { _, _ ->
+                filterType = filterTypeEdit.text.toString().trim().lowercase(Locale.getDefault())
+                filterSize = filterSizeSpinner.selectedItem.toString()
+                filterDate = filterDateSpinner.selectedItem.toString()
+                filterFiles()
+            }
+            .setNegativeButton("Clear") { _, _ ->
+                filterType = ""
+                filterSize = "All Sizes"
+                filterDate = "All Dates"
+                filterTypeEdit.setText("")
+                filterSizeSpinner.setSelection(0)
+                filterDateSpinner.setSelection(0)
+                filterFiles()
+            }
+            .setNeutralButton("Cancel") { dialog, _ -> dialog.dismiss() }
+            .show()
+    }
+
+    private fun debounceSearch() {
+        // Remove any existing search task
+        searchRunnable?.let { handler.removeCallbacks(it) }
+
+        // Schedule a new search task with a 300ms delay
+        searchRunnable = Runnable {
+            filterFiles()
+        }
+        handler.postDelayed(searchRunnable!!, 300)
+    }
+
+    private fun filterFiles() {
         fileList.clear()
-        if (query.isEmpty()) {
-            // Restore the full list with sorting applied
-            fileList.addAll(fullFileList)
+        fileAdapter.setSearchQuery(currentQuery) // For highlighting
+        fileAdapter.setCurrentDirPath(currentDir?.absolutePath ?: "") // Update current directory path
+
+        if (currentQuery.isEmpty() && filterType.isEmpty() && filterSize == "All Sizes" && filterDate == "All Dates") {
+            // Show only the current directory's files if no search or filters are applied
+            fileList.addAll(fullFileList.filter { File(it.path).parentFile?.absolutePath == currentDir?.absolutePath })
             sortAndUpdateFileList()
         } else {
-            // Filter the list based on the query
-            val filteredList = fullFileList.filter {
-                it.name.lowercase(Locale.getDefault()).contains(query.lowercase(Locale.getDefault()))
+            // Apply search and filters on the full recursive list
+            var filteredList = fullFileList.toList()
+
+            // Apply name search
+            if (currentQuery.isNotEmpty()) {
+                filteredList = filteredList.filter {
+                    it.name.lowercase(Locale.getDefault()).contains(currentQuery.lowercase(Locale.getDefault()))
+                }
             }
+
+            // Apply file type filter
+            if (filterType.isNotEmpty()) {
+                filteredList = filteredList.filter {
+                    val file = File(it.path)
+                    !it.isDirectory && file.extension.lowercase(Locale.getDefault()) == filterType
+                }
+            }
+
+            // Apply size filter
+            if (filterSize != "All Sizes") {
+                filteredList = filteredList.filter {
+                    val file = File(it.path)
+                    if (it.isDirectory) return@filter false // Exclude directories
+                    val sizeInMB = file.length() / (1024 * 1024).toFloat() // Size in MB
+                    when (filterSize) {
+                        "< 1 MB" -> sizeInMB < 1
+                        "1-10 MB" -> sizeInMB in 1.0..10.0
+                        "> 10 MB" -> sizeInMB > 10
+                        else -> true
+                    }
+                }
+            }
+
+            // Apply date filter
+            if (filterDate != "All Dates") {
+                filteredList = filteredList.filter {
+                    val file = File(it.path)
+                    val lastModified = file.lastModified()
+                    val calendar = Calendar.getInstance()
+                    calendar.timeInMillis = lastModified
+
+                    val now = Calendar.getInstance()
+                    when (filterDate) {
+                        "Today" -> {
+                            calendar.get(Calendar.YEAR) == now.get(Calendar.YEAR) &&
+                                    calendar.get(Calendar.DAY_OF_YEAR) == now.get(Calendar.DAY_OF_YEAR)
+                        }
+                        "This Week" -> {
+                            now.add(Calendar.DAY_OF_YEAR, -7)
+                            lastModified >= now.timeInMillis
+                        }
+                        "Older" -> {
+                            now.add(Calendar.DAY_OF_YEAR, -7)
+                            lastModified < now.timeInMillis
+                        }
+                        else -> true
+                    }
+                }
+            }
+
             fileList.addAll(filteredList)
-            // Apply sorting to the filtered list
             sortAndUpdateFileList()
+
             if (filteredList.isEmpty()) {
-                Toast.makeText(this, "No files found matching \"$query\"", Toast.LENGTH_SHORT).show()
+                val message = if (currentQuery.isNotEmpty()) {
+                    "No files found matching \"$currentQuery\""
+                } else {
+                    "No files found with the applied filters"
+                }
+                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
             }
         }
         fileAdapter.notifyDataSetChanged()
@@ -222,25 +373,38 @@ class MainActivity : AppCompatActivity() {
         fileList.clear()
         fullFileList.clear()
         try {
-            val files = currentDir?.listFiles()
-            if (files != null) {
-                files.forEach { file ->
-                    val fileItem = FileItem(file.name, file.isDirectory, file.absolutePath)
-                    fileList.add(fileItem)
-                    fullFileList.add(fileItem)
-                }
-                if (fileList.isEmpty()) {
-                    Toast.makeText(this, "No files found in ${currentDir?.absolutePath}", Toast.LENGTH_SHORT).show()
-                }
-            } else {
-                Toast.makeText(this, "Unable to access files in ${currentDir?.absolutePath}", Toast.LENGTH_LONG).show()
+            currentDir?.let { dir ->
+                loadFilesRecursively(dir)
+            }
+            // Initially show only the current directory's files
+            fileList.addAll(fullFileList.filter { File(it.path).parentFile?.absolutePath == currentDir?.absolutePath })
+            if (fileList.isEmpty()) {
+                Toast.makeText(this, "No files found in ${currentDir?.absolutePath}", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             Toast.makeText(this, "Error accessing files: ${e.message}", Toast.LENGTH_LONG).show()
         }
+        fileAdapter.setCurrentDirPath(currentDir?.absolutePath ?: "")
         sortAndUpdateFileList()
         // Update toolbar title with current directory path
         supportActionBar?.title = currentDir?.absolutePath ?: "File Manager"
+    }
+
+    private fun loadFilesRecursively(dir: File) {
+        try {
+            val files = dir.listFiles()
+            if (files != null) {
+                files.forEach { file ->
+                    val fileItem = FileItem(file.name, file.isDirectory, file.absolutePath)
+                    fullFileList.add(fileItem)
+                    if (file.isDirectory) {
+                        loadFilesRecursively(file)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // Skip directories that can't be accessed
+        }
     }
 
     private fun sortAndUpdateFileList() {
