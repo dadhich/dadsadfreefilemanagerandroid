@@ -17,6 +17,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import java.io.File
@@ -49,6 +50,7 @@ class MainActivity : AppCompatActivity() {
         fileListRecyclerView = findViewById(R.id.fileListRecyclerView)
         backButton = findViewById(R.id.backButton)
         fileListRecyclerView.layoutManager = LinearLayoutManager(this)
+        fileListRecyclerView.addItemDecoration(DividerItemDecoration(this, LinearLayoutManager.VERTICAL))
         fileAdapter = FileAdapter(fileList) { fileItem ->
             if (operationMode != null) {
                 // In copy/move mode, select destination folder

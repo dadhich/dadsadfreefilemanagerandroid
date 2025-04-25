@@ -3,6 +3,7 @@ package com.example.dadsad_freefilemanager
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.example.dadsad_freefilemanager.R
@@ -15,6 +16,7 @@ class FileAdapter(
     private var contextMenuPosition: Int = -1
 
     class FileViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        val fileIcon: ImageView = itemView.findViewById(R.id.fileIcon)
         val fileNameTextView: TextView = itemView.findViewById(R.id.fileNameTextView)
         val fileTypeTextView: TextView = itemView.findViewById(R.id.fileTypeTextView)
     }
@@ -27,6 +29,9 @@ class FileAdapter(
 
     override fun onBindViewHolder(holder: FileViewHolder, position: Int) {
         val fileItem = fileList[position]
+        holder.fileIcon.setImageResource(
+            if (fileItem.isDirectory) android.R.drawable.ic_menu_gallery else android.R.drawable.ic_menu_edit
+        )
         holder.fileNameTextView.text = fileItem.name
         holder.fileTypeTextView.text = if (fileItem.isDirectory) "Folder" else "File"
         holder.itemView.setOnClickListener {
