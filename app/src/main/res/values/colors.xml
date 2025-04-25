@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#4FC3F7</color> <!-- Light Blue from Cx File Explorer -->
+    <color name="colorPrimary">#4FC3F7</color> <!-- Light Blue -->
     <color name="colorPrimaryDark">#0288D1</color> <!-- Darker Blue -->
     <color name="colorAccent">#FFCA28</color> <!-- Amber for accents -->
     <color name="background">#F5F5F5</color> <!-- Light gray background -->

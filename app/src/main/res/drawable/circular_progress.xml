@@ -4,12 +4,5 @@
     android:innerRadiusRatio="2.5"
     android:thicknessRatio="10"
     android:useLevel="true">
-    <solid android:color="@android:color/transparent" />
-    <stroke
-        android:width="4dp"
-        android:color="@android:color/white" />
-    <gradient
-        android:startColor="@android:color/white"
-        android:endColor="@android:color/transparent"
-        android:type="sweep" />
+    <solid android:color="@android:color/white" />
 </shape>

@@ -49,6 +49,7 @@ class MainActivity : AppCompatActivity() {
         val toolbar: Toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.title = getString(R.string.app_name) // Set initial title to app name
 
         // Get the starting path from the intent
         val startPath = intent.getStringExtra("START_PATH") ?: Environment.getExternalStorageDirectory().absolutePath
