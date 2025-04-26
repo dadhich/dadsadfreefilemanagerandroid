@@ -49,8 +49,11 @@ class HomeActivity : AppCompatActivity() {
             Toast.makeText(this, "Recycle Bin not implemented", Toast.LENGTH_SHORT).show()
         }
 
-        findViewById<Button>(R.id.analyzeButton).setOnClickListener {
-            Toast.makeText(this, "Analyze feature not implemented", Toast.LENGTH_SHORT).show()
+        val analyzeStorageButton: Button = findViewById(R.id.analyzeStorageButton)
+        analyzeStorageButton.setOnClickListener {
+            val intent = Intent(this, StorageAnalysisActivity::class.java)
+            startActivity(intent)
+            overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
         }
 
         // Tab click listeners (for future implementation)
@@ -60,10 +63,6 @@ class HomeActivity : AppCompatActivity() {
 
         findViewById<TextView>(R.id.libraryTab).setOnClickListener {
             Toast.makeText(this, "Library tab not implemented", Toast.LENGTH_SHORT).show()
-        }
-
-        findViewById<TextView>(R.id.networkTab).setOnClickListener {
-            Toast.makeText(this, "Network tab not implemented", Toast.LENGTH_SHORT).show()
         }
     }
 

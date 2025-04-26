@@ -106,13 +106,14 @@
         </LinearLayout>
 
         <Button
-            android:id="@+id/analyzeButton"
+            android:id="@+id/analyzeStorageButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end"
             android:layout_marginTop="8dp"
+            android:layout_marginBottom="16dp"
             android:background="@android:color/transparent"
-            android:text="Analyze"
+            android:text="Analyze Storage"
             android:textColor="@android:color/white"
             android:textAllCaps="true" />
 
@@ -144,16 +145,6 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="LIBRARY"
-            android:textColor="@color/textSecondary"
-            android:textSize="16sp" />
-
-        <TextView
-            android:id="@+id/networkTab"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="NETWORK"
             android:textColor="@color/textSecondary"
             android:textSize="16sp" />
 

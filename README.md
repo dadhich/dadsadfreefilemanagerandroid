@@ -34,6 +34,20 @@ Dad's Ad-Free File Manager is a simple, lightweight, and ad-free file management
   - Tap on a file to open it in its default application (e.g., PDFs in a PDF viewer, images in a gallery app, text files in a text editor).
   - Falls back to showing file details with a Toast message if no app can open the file.
 
+- **Storage Analysis**:
+  - Analyze storage usage with a detailed breakdown by file type (Images, Audio, Videos, Documents, Archives, Others).
+  - View total storage, free space, and usage percentage.
+  - List large files (>10 MB) with their sizes.
+  - Placeholder for Recycle Bin size (to be implemented).
+
+- **Media Library**:
+  - Access a "Library" tab to quickly view media files (Images, Audio, Videos, Documents, New Files) from the entire device.
+  - Tap on a media type to see all files of that type in a search-like interface.
+
+- **Apps List**:
+  - View a list of installed apps with their sizes.
+  - Toggle between "Downloaded" and "All" apps using tabs.
+
 - **Permissions Handling**:
   - Requests necessary storage permissions to access files.
   - Supports Android 11+ scoped storage with "All Files Access" permission.
@@ -54,41 +68,7 @@ Dad's Ad-Free File Manager is a simple, lightweight, and ad-free file management
    - Select **File > Open** and navigate to the cloned repository folder.
    - Click **OK** to open the project.
 3. **Sync and Build**:
-   - Click **Sync Project with Gradle Files** to download dependencies.
-   - Click **Build > Rebuild Project** to ensure the project builds successfully.
-4. **Run the App**:
-   - Connect an Android device or start an emulator.
-   - Click **Run > Run 'app'** to install and launch the app on your device/emulator.
-   - Grant the necessary storage permissions when prompted.
-
-## Usage
-1. **Launch the App**:
-   - Open the app to see the `HomeActivity` with quick access buttons for "Main Storage" and "Downloads".
-2. **Browse Files**:
-   - Tap on "Main Storage" or "Downloads" to view the file list in `MainActivity`.
-   - Tap on a folder to navigate into it, or use the back button to go to the parent directory.
-3. **Sort Files**:
-   - Tap the sort icon in the toolbar to choose a sorting criterion (name, size, date, type) and order (ascending/descending).
-4. **Search for Files**:
-   - Tap the search icon in the toolbar to start searching.
-   - Enter a query to search recursively through all subdirectories.
-   - Tap the filter icon to apply advanced filters (file type, size, date modified).
-   - Matching file names are highlighted, and full paths are shown for files in subdirectories.
-5. **Manage Files**:
-   - Long-press on a file or folder to open the context menu.
-   - Choose to copy, move, delete, or rename the file/folder.
-   - For copy/move, navigate to the destination folder and tap it to complete the operation.
-6. **Open Files**:
-   - Tap on a file to open it in its default application.
-   - If the file cannot be opened, a Toast message will appear, and the file details will be shown in a dialog.
-
-## Contributing
-Contributions are welcome! If you’d like to contribute:
-1. Fork the repository.
-2. Create a new branch for your feature or bug fix (`git checkout -b feature/your-feature-name`).
-3. Make your changes and commit them (`git commit -m "Add your feature"`).
-4. Push to your branch (`git push origin feature/your-feature-name`).
-5. Open a pull request with a detailed description of your changes.
+   - Click
 
 ## License
 This project is licensed under the Creative Commons Attribution-NonCommercial-NoDerivatives License - see the [LICENSE](LICENSE) file for details.

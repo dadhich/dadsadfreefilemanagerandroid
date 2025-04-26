@@ -38,29 +38,25 @@ import java.util.Date
 import java.util.Locale
 import android.webkit.MimeTypeMap
 import androidx.appcompat.widget.Toolbar
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.contract.ActivityResultContracts
 
 class MainActivity : AppCompatActivity() {
     private val STORAGE_PERMISSION_CODE = 100
     private val MANAGE_STORAGE_CODE = 101
     private lateinit var fileListRecyclerView: RecyclerView
     private val fileList = mutableListOf<FileItem>()
-    private val fullFileList = mutableListOf<FileItem>() // Store all files recursively
+    private val fullFileList = mutableListOf<FileItem>()
     private lateinit var fileAdapter: FileAdapter
-    private var currentDir: File? = null // Will be set in onCreate
+    private var currentDir: File? = null
     private var selectedFileItem: FileItem? = null
-    private var operationMode: String? = null // "copy" or "move"
+    private var operationMode: String? = null
 
-    // Sort criteria and order
-    private var sortBy: String = "name" // Default sort by name
-    private var sortOrder: String = "asc" // Default ascending order
+    private var sortBy: String = "name"
+    private var sortOrder: String = "asc"
 
-    // Search and filter variables
     private var currentQuery: String = ""
-    private var filterType: String = "" // e.g., "txt", "pdf"
-    private var filterSize: String = "All Sizes" // e.g., "< 1 MB"
-    private var filterDate: String = "All Dates" // e.g., "Today"
+    private var filterType: String = ""
+    private var filterSize: String = "All Sizes"
+    private var filterDate: String = "All Dates"
     private val handler = Handler(Looper.getMainLooper())
     private var searchRunnable: Runnable? = null
 
@@ -68,13 +64,11 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Set up the toolbar
         val toolbar: Toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.title = getString(R.string.app_name) // Set initial title to app name
+        supportActionBar?.title = getString(R.string.app_name)
 
-        // Get the starting path from the intent
         val startPath = intent.getStringExtra("START_PATH") ?: Environment.getExternalStorageDirectory().absolutePath
         currentDir = File(startPath)
 
@@ -101,34 +95,38 @@ class MainActivity : AppCompatActivity() {
         fileListRecyclerView.adapter = fileAdapter
         registerForContextMenu(fileListRecyclerView)
 
-        checkAndRequestPermissions()
+        // Check for auto-search parameters from LibraryFragment
+        if (intent.getBooleanExtra("AUTO_SEARCH", false)) {
+            filterType = intent.getStringExtra("FILTER_TYPE")?.split(",")?.joinToString("") { it.trim() } ?: ""
+            filterDate = intent.getStringExtra("FILTER_DATE") ?: "All Dates"
+            currentQuery = "" // No query, just filter by type or date
+            filterFiles()
+        } else {
+            checkAndRequestPermissions()
+        }
     }
 
     private fun openFile(fileItem: FileItem) {
         val file = File(fileItem.path)
         try {
-            // Get the file URI using FileProvider
             val uri = FileProvider.getUriForFile(
                 this,
                 "com.example.dadsad_freefilemanager.fileprovider",
                 file
             )
 
-            // Determine the MIME type
             val mimeType = getMimeType(file) ?: "*/*"
 
-            // Create an intent to view the file
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, mimeType)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
 
-            // Start the activity to open the file
             startActivity(intent)
         } catch (e: Exception) {
             Toast.makeText(this, "Cannot open file: ${e.message}", Toast.LENGTH_LONG).show()
-            showFileDetails(fileItem) // Fallback to showing file details
+            showFileDetails(fileItem)
         }
     }
 
@@ -144,14 +142,13 @@ class MainActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.menu_file_list, menu)
 
-        // Set up the SearchView
         val searchItem = menu?.findItem(R.id.action_search)
         val searchView = searchItem?.actionView as SearchView
         searchView.queryHint = "Search files..."
 
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
-                return false // Not handling submit action
+                return false
             }
 
             override fun onQueryTextChange(newText: String?): Boolean {
@@ -161,7 +158,6 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        // Restore the full list when the SearchView is closed
         searchItem.setOnActionExpandListener(object : MenuItem.OnActionExpandListener {
             override fun onMenuItemActionExpand(item: MenuItem): Boolean {
                 return true
@@ -244,7 +240,6 @@ class MainActivity : AppCompatActivity() {
         val filterSizeSpinner = dialogView.findViewById<Spinner>(R.id.filter_size)
         val filterDateSpinner = dialogView.findViewById<Spinner>(R.id.filter_date)
 
-        // Set up spinners
         ArrayAdapter.createFromResource(
             this,
             R.array.size_filter_options,
@@ -269,7 +264,6 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        // Set current filter type
         filterTypeEdit.setText(filterType)
 
         AlertDialog.Builder(this)
@@ -295,10 +289,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun debounceSearch() {
-        // Remove any existing search task
         searchRunnable?.let { handler.removeCallbacks(it) }
 
-        // Schedule a new search task with a 300ms delay
         searchRunnable = Runnable {
             filterFiles()
         }
@@ -307,38 +299,34 @@ class MainActivity : AppCompatActivity() {
 
     private fun filterFiles() {
         fileList.clear()
-        fileAdapter.setSearchQuery(currentQuery) // For highlighting
-        fileAdapter.setCurrentDirPath(currentDir?.absolutePath ?: "") // Update current directory path
+        fileAdapter.setSearchQuery(currentQuery)
+        fileAdapter.setCurrentDirPath(currentDir?.absolutePath ?: "")
 
         if (currentQuery.isEmpty() && filterType.isEmpty() && filterSize == "All Sizes" && filterDate == "All Dates") {
-            // Show only the current directory's files if no search or filters are applied
             fileList.addAll(fullFileList.filter { File(it.path).parentFile?.absolutePath == currentDir?.absolutePath })
             sortAndUpdateFileList()
         } else {
-            // Apply search and filters on the full recursive list
             var filteredList = fullFileList.toList()
 
-            // Apply name search
             if (currentQuery.isNotEmpty()) {
                 filteredList = filteredList.filter {
                     it.name.lowercase(Locale.getDefault()).contains(currentQuery.lowercase(Locale.getDefault()))
                 }
             }
 
-            // Apply file type filter
             if (filterType.isNotEmpty()) {
+                val extensions = filterType.split(",").map { it.trim() }
                 filteredList = filteredList.filter {
                     val file = File(it.path)
-                    !it.isDirectory && file.extension.lowercase(Locale.getDefault()) == filterType
+                    !it.isDirectory && extensions.contains(file.extension.lowercase(Locale.getDefault()))
                 }
             }
 
-            // Apply size filter
             if (filterSize != "All Sizes") {
                 filteredList = filteredList.filter {
                     val file = File(it.path)
-                    if (it.isDirectory) return@filter false // Exclude directories
-                    val sizeInMB = file.length() / (1024 * 1024).toFloat() // Size in MB
+                    if (it.isDirectory) return@filter false
+                    val sizeInMB = file.length() / (1024 * 1024).toFloat()
                     when (filterSize) {
                         "< 1 MB" -> sizeInMB < 1
                         "1-10 MB" -> sizeInMB in 1.0..10.0
@@ -348,7 +336,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // Apply date filter
             if (filterDate != "All Dates") {
                 filteredList = filteredList.filter {
                     val file = File(it.path)
@@ -417,7 +404,6 @@ class MainActivity : AppCompatActivity() {
             currentDir?.let { dir ->
                 loadFilesRecursively(dir)
             }
-            // Initially show only the current directory's files
             fileList.addAll(fullFileList.filter { File(it.path).parentFile?.absolutePath == currentDir?.absolutePath })
             if (fileList.isEmpty()) {
                 Toast.makeText(this, "No files found in ${currentDir?.absolutePath}", Toast.LENGTH_SHORT).show()
@@ -427,7 +413,6 @@ class MainActivity : AppCompatActivity() {
         }
         fileAdapter.setCurrentDirPath(currentDir?.absolutePath ?: "")
         sortAndUpdateFileList()
-        // Update toolbar title with current directory path
         supportActionBar?.title = currentDir?.absolutePath ?: "File Manager"
     }
 
@@ -449,21 +434,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sortAndUpdateFileList() {
-        // Separate directories and files for better organization
         val directories = fileList.filter { it.isDirectory }
         val files = fileList.filter { !it.isDirectory }
 
-        // Sort directories
         val sortedDirectories = directories.sortedWith(getComparator())
-        // Sort files
         val sortedFiles = files.sortedWith(getComparator())
 
-        // Combine the lists: directories first, then files
         fileList.clear()
         fileList.addAll(sortedDirectories)
         fileList.addAll(sortedFiles)
 
-        // Notify the adapter to refresh the RecyclerView
         fileAdapter.notifyDataSetChanged()
     }
 
@@ -621,7 +601,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showFileDetails(fileItem: FileItem) {
         val file = File(fileItem.path)
-        val size = file.length() / 1024 // Size in KB
+        val size = file.length() / 1024
         val lastModified = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date(file.lastModified()))
         val details = """
             Name: ${fileItem.name}
